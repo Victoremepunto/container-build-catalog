@@ -109,16 +109,49 @@ spec:
       requests:
         memory: 4Gi
         cpu: 250m
-    args: ["$(params.IMAGES[*])"]
+    # Both array params travel through args (array params cannot be interpolated
+    # inside a script string). They are flag-delimited so the script can split
+    # them back into two bash arrays. IMAGES_PLATFORMS defaults to [] so, when
+    # unset, only the --images sentinel and the image refs are passed.
+    args:
+      - "--images-platforms"
+      - "$(params.IMAGES_PLATFORMS[*])"
+      - "--images"
+      - "$(params.IMAGES[*])"
     script: |
       #!/bin/bash
       # Fixing group permission on /var/lib/containers
       set -eu
       set -o pipefail
 
-      # Optional per-image platform mapping ("imageRef=os/arch" entries).
-      # Declared as a bash array from the array param; empty by default.
-      IMAGES_PLATFORMS=($(params.IMAGES_PLATFORMS[*]))
+      # Split the flag-delimited positional args (passed via args:) back into two
+      # bash arrays. Everything after --images-platforms up to --images is the
+      # optional per-image platform mapping ("imageRef=os/arch" entries); keying
+      # by ref makes the mapping immune to matrix result ordering. Everything
+      # after --images is the list of image manifests.
+      PLATFORM_ARGS=()
+      IMAGES=()
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --images-platforms)
+            shift
+            while [ $# -gt 0 ] && [ "$1" != "--images" ]; do
+              [ -n "$1" ] && PLATFORM_ARGS+=("--images-platforms" "$1")
+              shift
+            done
+            ;;
+          --images)
+            shift
+            while [ $# -gt 0 ]; do
+              [ -n "$1" ] && IMAGES+=("$1")
+              shift
+            done
+            ;;
+          *)
+            shift
+            ;;
+        esac
+      done
 
       chown root:root /var/lib/containers
 
@@ -135,14 +168,6 @@ spec:
 
       MANIFEST_DATA_FILE="/index-build-data/manifest_data.json"
 
-      # Build the optional --images-platforms arguments from the array param.
-      # Each entry is "imageRef=os/arch"; keying by ref makes the mapping
-      # immune to matrix result ordering.
-      PLATFORM_ARGS=()
-      for platform_entry in ${IMAGES_PLATFORMS[@]+"${IMAGES_PLATFORMS[@]}"}; do
-        [ -n "$platform_entry" ] && PLATFORM_ARGS+=("--images-platforms" "$platform_entry")
-      done
-
       echo "Running konflux-build-cli"
       if ! konflux-build-cli image build-image-index \
         --image "$IMAGE" \
@@ -156,7 +181,7 @@ spec:
         --result-path-image-ref "$(results.IMAGE_REF.path)" \
         --result-path-images "$(results.IMAGES.path)" \
         ${PLATFORM_ARGS[@]+"${PLATFORM_ARGS[@]}"} \
-        --images "$@"; then
+        --images "${IMAGES[@]}"; then
         echo "Failed to build image index"
         exit 1
       fi
