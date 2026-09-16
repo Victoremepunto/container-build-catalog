@@ -1,3 +1,4 @@
+# WARNING: This is an auto generated file, do not modify this file directly
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -27,7 +28,7 @@ spec:
       each index entry explicitly, which is required for OCI artifacts whose empty
       config carries no platform information. When empty, platforms are left to buildah's
       inference (unchanged behaviour).
-    name: IMAGES_PLATFORMS
+    name: IMAGE_PLATFORM_MAP
     type: array
   - default: "true"
     description: Build an image index even if IMAGES is of length 1. Default true.
@@ -96,13 +97,9 @@ spec:
       readOnly: true
   steps:
   - args:
-    # Both array params travel through args (array params cannot be interpolated
-    # inside a script string). They are flag-delimited so the script can split
-    # them back into two bash arrays. IMAGES_PLATFORMS defaults to [] so, when
-    # unset, only the --images sentinel and the image refs are passed.
-    - "--images-platforms"
-    - $(params.IMAGES_PLATFORMS[*])
-    - "--images"
+    - --image-platform-map
+    - $(params.IMAGE_PLATFORM_MAP[*])
+    - --images
     - $(params.IMAGES[*])
     computeResources:
       limits:
@@ -118,19 +115,15 @@ spec:
       set -eu
       set -o pipefail
 
-      # Split the flag-delimited positional args (passed via args:) back into two
-      # bash arrays. Everything after --images-platforms up to --images is the
-      # optional per-image platform mapping ("imageRef=os/arch" entries); keying
-      # by ref makes the mapping immune to matrix result ordering. Everything
-      # after --images is the list of image manifests.
+      # Split the flag-delimited args back into two bash arrays.
       PLATFORM_ARGS=()
       IMAGES=()
       while [ $# -gt 0 ]; do
         case "$1" in
-          --images-platforms)
+          --image-platform-map)
             shift
             while [ $# -gt 0 ] && [ "$1" != "--images" ]; do
-              [ -n "$1" ] && PLATFORM_ARGS+=("--images-platforms" "$1")
+              [ -n "$1" ] && PLATFORM_ARGS+=("--image-platform-map" "$1")
               shift
             done
             ;;
@@ -163,6 +156,7 @@ spec:
       MANIFEST_DATA_FILE="/index-build-data/manifest_data.json"
 
       echo "Running konflux-build-cli"
+      # shellcheck disable=SC2153  # IMAGE is provided via the step env, not assigned here
       if ! konflux-build-cli image build-image-index \
         --image "$IMAGE" \
         --tls-verify="$TLSVERIFY" \

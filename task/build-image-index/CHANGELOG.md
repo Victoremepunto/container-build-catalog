@@ -4,9 +4,9 @@
 
 ### Added
 
-- `IMAGES_PLATFORMS` parameter: optional per-image platform mapping
+- `IMAGE_PLATFORM_MAP` parameter: optional per-image platform mapping
   (`imageRef=os/arch` entries) passed to `konflux-build-cli` as
-  `--images-platforms`. This sets the platform on each index entry explicitly,
+  `--image-platform-map`. This sets the platform on each index entry explicitly,
   which is required for OCI artifacts whose empty config carries no platform
   information (e.g. disk images), where the platform would otherwise be null.
   When empty (the default), behaviour is unchanged.

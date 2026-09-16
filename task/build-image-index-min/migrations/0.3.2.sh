@@ -19,9 +19,7 @@ if [ ${#tasks_names[@]} -eq 0 ]; then
     exit 0
 fi
 
-# IMAGES_PLATFORMS is optional (defaults to []), so pipelines work unchanged
-# without it. add-param is idempotent and only makes the mapping explicit for
-# pipelines that want to set per-child platform on the image index.
+# add-param is idempotent; IMAGE_PLATFORM_MAP defaults to [] so pipelines work unchanged.
 for task_name in "${tasks_names[@]}"; do
-    pmt modify -f "$pipeline_file" task "$task_name" add-param IMAGES_PLATFORMS "[]"
+    pmt modify -f "$pipeline_file" task "$task_name" add-param IMAGE_PLATFORM_MAP "[]"
 done
