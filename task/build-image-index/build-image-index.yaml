@@ -99,7 +99,10 @@ spec:
         mountPath: /mnt/trusted-ca
         readOnly: true
   steps:
-  - image: quay.io/konflux-ci/konflux-build-cli@sha256:85141954209ee158fe9e559869a0da196ff08c5d4bb15b1a6c2e54d4fcd6b52f
+  # TEST ONLY (AIPCC-1307): use a locally-rebuilt konflux-build-cli image that
+  # contains the unmerged --image-platform-map fix (konflux-ci/konflux-build-cli#249,
+  # head 1d5e786) instead of the released bundle. Revert before merging.
+  - image: quay.io/vmugicag/konflux-build-cli:aipcc-1307-v2
     # per https://kubernetes.io/docs/concepts/containers/images/#imagepullpolicy-defaulting
     # the cluster will set imagePullPolicy to IfNotPresent
     name: build
