@@ -6,7 +6,7 @@ metadata:
     tekton.dev/pipelines.minVersion: 0.12.1
     tekton.dev/tags: image-build, konflux
   labels:
-    app.kubernetes.io/version: 0.3.2
+    app.kubernetes.io/version: "0.4"
   name: build-image-index-min
 spec:
   description: This takes existing Image Manifests and combines them in an Image Index.
@@ -115,31 +115,6 @@ spec:
       set -eu
       set -o pipefail
 
-      # Split the flag-delimited args back into two bash arrays.
-      PLATFORM_ARGS=()
-      IMAGES=()
-      while [ $# -gt 0 ]; do
-        case "$1" in
-          --image-platform-map)
-            shift
-            while [ $# -gt 0 ] && [ "$1" != "--images" ]; do
-              [ -n "$1" ] && PLATFORM_ARGS+=("--image-platform-map" "$1")
-              shift
-            done
-            ;;
-          --images)
-            shift
-            while [ $# -gt 0 ]; do
-              [ -n "$1" ] && IMAGES+=("$1")
-              shift
-            done
-            ;;
-          *)
-            shift
-            ;;
-        esac
-      done
-
       chown root:root /var/lib/containers
 
       sed -i 's/^\s*short-name-mode\s*=\s*.*/short-name-mode = "disabled"/' /etc/containers/registries.conf
@@ -168,8 +143,7 @@ spec:
         --result-path-image-url "$(results.IMAGE_URL.path)" \
         --result-path-image-ref "$(results.IMAGE_REF.path)" \
         --result-path-images "$(results.IMAGES.path)" \
-        ${PLATFORM_ARGS[@]+"${PLATFORM_ARGS[@]}"} \
-        --images "${IMAGES[@]}"; then
+        "$@"; then
         echo "Failed to build image index"
         exit 1
       fi

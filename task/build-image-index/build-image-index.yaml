@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   labels:
-    app.kubernetes.io/version: 0.3.2
+    app.kubernetes.io/version: "0.4"
   annotations:
     tekton.dev/pipelines.minVersion: "0.12.1"
     tekton.dev/tags: "image-build, konflux"
@@ -109,8 +109,10 @@ spec:
       requests:
         memory: 4Gi
         cpu: 250m
-    # Array params must travel via args, not script interpolation; flag-delimited
-    # so the script can split them back into two bash arrays.
+    # Array params must travel via args, not script interpolation.
+    # konflux-build-cli's ExpandArrayParameters already accepts the
+    # "--flag v1 v2 --flag2 v1 v2" form, so these are forwarded to it
+    # unmodified via "$@" below.
     args:
       - "--image-platform-map"
       - "$(params.IMAGE_PLATFORM_MAP[*])"
@@ -121,31 +123,6 @@ spec:
       # Fixing group permission on /var/lib/containers
       set -eu
       set -o pipefail
-
-      # Split the flag-delimited args back into two bash arrays.
-      PLATFORM_ARGS=()
-      IMAGES=()
-      while [ $# -gt 0 ]; do
-        case "$1" in
-          --image-platform-map)
-            shift
-            while [ $# -gt 0 ] && [ "$1" != "--images" ]; do
-              [ -n "$1" ] && PLATFORM_ARGS+=("--image-platform-map" "$1")
-              shift
-            done
-            ;;
-          --images)
-            shift
-            while [ $# -gt 0 ]; do
-              [ -n "$1" ] && IMAGES+=("$1")
-              shift
-            done
-            ;;
-          *)
-            shift
-            ;;
-        esac
-      done
 
       chown root:root /var/lib/containers
 
@@ -175,8 +152,7 @@ spec:
         --result-path-image-url "$(results.IMAGE_URL.path)" \
         --result-path-image-ref "$(results.IMAGE_REF.path)" \
         --result-path-images "$(results.IMAGES.path)" \
-        ${PLATFORM_ARGS[@]+"${PLATFORM_ARGS[@]}"} \
-        --images "${IMAGES[@]}"; then
+        "$@"; then
         echo "Failed to build image index"
         exit 1
       fi
